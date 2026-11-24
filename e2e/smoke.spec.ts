@@ -121,3 +121,45 @@ test.describe('Phase 2 – App Shell and Layout', () => {
     await collapseHandle.click()
   })
 })
+
+test.describe('Phase 3 – Color System and Stop Editor', () => {
+  test('editing stops, color formats, and undo/redo', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+
+    // Colors panel is open by default. Verify StopEditor controls are visible
+    await expect(page.getByText('Gradient Stops Bar').first()).toBeVisible()
+    await expect(page.getByText('Color Palette Picker').first()).toBeVisible()
+
+    // Check color format tabs exist
+    await expect(page.getByRole('button', { name: /hex/i }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /rgb/i }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /hsl/i }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /oklch/i }).first()).toBeVisible()
+
+    // Add a stop
+    const addStopBtn = page.getByRole('button', { name: /add stop/i }).first()
+    await addStopBtn.click()
+
+    // Check stop count increased to 3
+    await expect(page.getByText(/3 stops/i).first()).toBeVisible()
+
+    // Switch to OKLCH tab
+    await page.getByRole('button', { name: /oklch/i }).first().click()
+    await expect(page.getByLabel('OKLCH Lightness').first()).toBeVisible()
+    await expect(page.getByLabel('OKLCH Chroma').first()).toBeVisible()
+    await expect(page.getByLabel('OKLCH Hue').first()).toBeVisible()
+
+    // Switch interpolation to OKLab
+    const oklabBtn = page.getByRole('button', { name: /oklab/i }).first()
+    await oklabBtn.click()
+
+    // Undo the addition
+    const undoBtn = page.getByLabel('Undo')
+    await undoBtn.click()
+
+    // Redo restores it
+    const redoBtn = page.getByLabel('Redo')
+    await redoBtn.click()
+  })
+})

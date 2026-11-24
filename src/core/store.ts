@@ -17,7 +17,15 @@ import { hasStops } from './types'
 import { createDefaultProject, defaultGradientConfig } from './defaults'
 import { projectSchema } from './schema'
 import { randomizeProject } from './randomize'
-import { generateId } from '@/lib/utils'
+import {
+  addStopAt,
+  removeStopById,
+  moveStopTo,
+  updateStopColor as updateStopColorPure,
+  updateStopOpacity as updateStopOpacityPure,
+  distributeStopsEqually,
+  reverseStops as reverseStopsPure,
+} from '@/color/stops'
 
 export interface AppStore {
   // --- Project State ---
@@ -30,6 +38,10 @@ export interface AppStore {
   removeStop: (id: string) => void
   moveStop: (id: string, position: number) => void
   updateStopColor: (id: string, color: string) => void
+  updateStopOpacity: (id: string, opacity: number) => void
+  updateStop: (id: string, partial: Partial<ColorStop>) => void
+  distributeStops: () => void
+  reverseStops: () => void
   updateGlobal: (update: Partial<Project['global']>) => void
   updateCanvas: (update: Partial<Project['canvas']>) => void
   updateNoise: (update: Partial<Project['effects']['noise']>) => void
@@ -47,6 +59,8 @@ export interface AppStore {
   theme: 'light' | 'dark'
   toggleTheme: () => void
   setTheme: (theme: 'light' | 'dark') => void
+  selectedStopId: string | null
+  setSelectedStopId: (id: string | null) => void
   activePanel: string | null
   setActivePanel: (panel: string | null) => void
   exportPanelOpen: boolean
@@ -72,10 +86,13 @@ export const useStore = create<
       setType: (type: GradientType) => {
         set((state) => {
           if (state.project.gradient.type === type) return state
+          const newGrad = defaultGradientConfig(type)
+          const firstStopId = hasStops(newGrad) && newGrad.stops.length > 0 ? newGrad.stops[0].id : null
           return {
+            selectedStopId: firstStopId,
             project: {
               ...state.project,
-              gradient: defaultGradientConfig(type),
+              gradient: newGrad,
             },
           }
         })
@@ -95,37 +112,16 @@ export const useStore = create<
       },
 
       // Add stop to gradient if supported
-      addStop: (color = '#ffffff', position) => {
+      addStop: (color, position) => {
         set((state) => {
           const { gradient } = state.project
           if (!hasStops(gradient)) return state
 
-          const currentStops = gradient.stops
-          const calculatedPos =
-            currentStops.length > 0
-              ? Math.min(
-                  100,
-                  Math.round(
-                    (currentStops[currentStops.length - 1].position +
-                      (currentStops[currentStops.length - 2]?.position ?? 0)) /
-                      2,
-                  ),
-                )
-              : 50
-          const nextPos = position ?? calculatedPos
-
-          const newStop: ColorStop = {
-            id: generateId(),
-            color,
-            position: nextPos,
-            opacity: 1,
-          }
-
-          const stops = [...currentStops, newStop].sort(
-            (a, b) => a.position - b.position,
-          )
+          const stops = addStopAt(gradient.stops, position, color)
+          const addedStop = stops.find((s) => !gradient.stops.some((prev) => prev.id === s.id))
 
           return {
+            selectedStopId: addedStop ? addedStop.id : state.selectedStopId,
             project: {
               ...state.project,
               gradient: {
@@ -143,12 +139,16 @@ export const useStore = create<
           const { gradient } = state.project
           if (!hasStops(gradient) || gradient.stops.length <= 2) return state
 
+          const stops = removeStopById(gradient.stops, id)
+          const remainingId = stops.length > 0 ? stops[0].id : null
+
           return {
+            selectedStopId: state.selectedStopId === id ? remainingId : state.selectedStopId,
             project: {
               ...state.project,
               gradient: {
                 ...gradient,
-                stops: gradient.stops.filter((s) => s.id !== id),
+                stops,
               },
             },
           }
@@ -161,10 +161,7 @@ export const useStore = create<
           const { gradient } = state.project
           if (!hasStops(gradient)) return state
 
-          const clampedPos = Math.max(0, Math.min(100, position))
-          const stops = gradient.stops
-            .map((s) => (s.id === id ? { ...s, position: clampedPos } : s))
-            .sort((a, b) => a.position - b.position)
+          const stops = moveStopTo(gradient.stops, id, position)
 
           return {
             project: {
@@ -184,14 +181,93 @@ export const useStore = create<
           const { gradient } = state.project
           if (!hasStops(gradient)) return state
 
+          const stops = updateStopColorPure(gradient.stops, id, color)
+
           return {
             project: {
               ...state.project,
               gradient: {
                 ...gradient,
-                stops: gradient.stops.map((s) =>
-                  s.id === id ? { ...s, color } : s,
-                ),
+                stops,
+              },
+            },
+          }
+        })
+      },
+
+      // Update opacity for a specific stop
+      updateStopOpacity: (id: string, opacity: number) => {
+        set((state) => {
+          const { gradient } = state.project
+          if (!hasStops(gradient)) return state
+
+          const stops = updateStopOpacityPure(gradient.stops, id, opacity)
+
+          return {
+            project: {
+              ...state.project,
+              gradient: {
+                ...gradient,
+                stops,
+              },
+            },
+          }
+        })
+      },
+
+      // Update multiple stop attributes
+      updateStop: (id: string, partial: Partial<ColorStop>) => {
+        set((state) => {
+          const { gradient } = state.project
+          if (!hasStops(gradient)) return state
+
+          let stops = gradient.stops.map((s) => (s.id === id ? { ...s, ...partial } : s))
+          if (partial.position !== undefined) {
+            stops = stops.sort((a, b) => a.position - b.position)
+          }
+
+          return {
+            project: {
+              ...state.project,
+              gradient: {
+                ...gradient,
+                stops,
+              },
+            },
+          }
+        })
+      },
+
+      // Distribute stops evenly
+      distributeStops: () => {
+        set((state) => {
+          const { gradient } = state.project
+          if (!hasStops(gradient)) return state
+
+          return {
+            project: {
+              ...state.project,
+              gradient: {
+                ...gradient,
+                stops: distributeStopsEqually(gradient.stops),
+              },
+            },
+          }
+        })
+      },
+
+      // Reverse stop colors and opacities
+      reverseStops: () => {
+        set((state) => {
+          const { gradient } = state.project
+          if (!hasStops(gradient)) return state
+
+          return {
+            project: {
+              ...state.project,
+              gradient: {
+                ...gradient,
+                stops: reverseStopsPure(gradient.stops),
               },
             },
           }
@@ -242,12 +318,20 @@ export const useStore = create<
 
       // Reset project to default
       reset: () => {
-        set({ project: createDefaultProject() })
+        const defaultProj = createDefaultProject()
+        const firstStopId = hasStops(defaultProj.gradient) && defaultProj.gradient.stops.length > 0
+          ? defaultProj.gradient.stops[0].id
+          : null
+        set({ project: defaultProj, selectedStopId: firstStopId })
       },
 
       // Randomize project palette and type
       randomize: () => {
-        set({ project: randomizeProject() })
+        const randomProj = randomizeProject()
+        const firstStopId = hasStops(randomProj.gradient) && randomProj.gradient.stops.length > 0
+          ? randomProj.gradient.stops[0].id
+          : null
+        set({ project: randomProj, selectedStopId: firstStopId })
       },
 
       // Load project with Zod validation
@@ -259,7 +343,10 @@ export const useStore = create<
             .join('; ')
           return { success: false, error: issueMsg }
         }
-        set({ project: result.data })
+        const firstStopId = hasStops(result.data.gradient) && result.data.gradient.stops.length > 0
+          ? result.data.gradient.stops[0].id
+          : null
+        set({ project: result.data, selectedStopId: firstStopId })
         return { success: true }
       },
 
@@ -295,6 +382,10 @@ export const useStore = create<
           }
         }
         set({ theme })
+      },
+      selectedStopId: 'stop-0',
+      setSelectedStopId: (selectedStopId) => {
+        set({ selectedStopId })
       },
       activePanel: 'colors',
       setActivePanel: (activePanel) => {
