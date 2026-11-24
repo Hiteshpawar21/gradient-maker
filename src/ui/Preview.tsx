@@ -1,65 +1,58 @@
-import { useMemo } from 'react'
+// ---------------------------------------------------------------------------
+// Preview Component
+// Renders live preview: CSS background for CSS tier, Canvas 2D for Canvas tier.
+// Shows read-only generated CSS in a box with copy button.
+// ---------------------------------------------------------------------------
+
+import { useMemo, useRef, useEffect } from 'react'
 import { useStore } from '@/core/store'
-import { hasStops } from '@/core/types'
+import { getRenderer } from '@/engine'
+import { CssOutputBox } from './CssOutputBox'
 import { Maximize2 } from 'lucide-react'
 
 export default function Preview() {
   const { project } = useStore()
   const { canvas, gradient, global } = project
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Calculate CSS gradient background preview for the current type
-  const gradientStyle = useMemo(() => {
-    const stops = hasStops(gradient)
-      ? gradient.stops.map((s) => `${s.color} ${s.position}%`).join(', ')
-      : '#3b82f6, #8b5cf6'
+  // Get renderer from engine registry
+  const renderer = useMemo(() => getRenderer(gradient.type), [gradient.type])
 
-    switch (gradient.type) {
-      case 'linear':
-        return `linear-gradient(${gradient.angle}deg, ${stops})`
-      case 'radial':
-        return `radial-gradient(${gradient.shape} at ${gradient.centerX}% ${gradient.centerY}%, ${stops})`
-      case 'conic':
-        return `conic-gradient(from ${gradient.startAngle}deg at ${gradient.centerX}% ${gradient.centerY}%, ${stops})`
-      case 'diamond':
-        return `linear-gradient(45deg, #3b82f6 25%, #8b5cf6 25%, #8b5cf6 50%, #3b82f6 50%, #3b82f6 75%, #8b5cf6 75%)`
-      case 'repeating-linear':
-        return `repeating-linear-gradient(${gradient.angle}deg, ${stops})`
-      case 'repeating-radial':
-        return `repeating-radial-gradient(${gradient.shape} at ${gradient.centerX}% ${gradient.centerY}%, ${stops})`
-      case 'repeating-conic':
-        return `repeating-conic-gradient(from ${gradient.startAngle}deg at ${gradient.centerX}% ${gradient.centerY}%, ${stops})`
-      case 'mesh':
-        return `radial-gradient(at 0% 0%, #ef4444 0px, transparent 50%), radial-gradient(at 100% 0%, #22c55e 0px, transparent 50%), radial-gradient(at 50% 100%, #3b82f6 0px, transparent 50%), #eab308`
-      case 'freeform':
-        return `radial-gradient(circle at 25% 25%, #ef4444 0%, transparent 45%), radial-gradient(circle at 75% 75%, #3b82f6 0%, transparent 45%), #8b5cf6`
-      case 'shape-blur':
-        return `radial-gradient(ellipse at 40% 40%, #ff6b6b 0%, #4ecdc4 75%)`
-      case 'layered':
-        return `linear-gradient(to right, rgba(59,130,246,0.8), rgba(236,72,153,0.8)), linear-gradient(to bottom, #10b981, #6366f1)`
-      case 'reflected':
-        return `linear-gradient(to right, #3b82f6, #8b5cf6 50%, #3b82f6)`
-      case 'aurora':
-        return `linear-gradient(180deg, #0f172a 0%, #065f46 40%, #0284c7 70%, #a855f7 100%)`
-      case 'holographic':
-        return `conic-gradient(from 45deg, #67e8f9, #c084fc, #f9a8d4, #67e8f9)`
-      case 'grainy':
-        return `linear-gradient(135deg, #f43f5e, #fbbf24)`
-      default:
-        return `linear-gradient(to right, ${stops})`
+  // Generated CSS rule string (null for non-CSS tiers like Diamond)
+  const cssString = useMemo(() => {
+    if (renderer?.toCSS) {
+      return renderer.toCSS(gradient, project)
     }
-  }, [gradient])
+    return null
+  }, [renderer, gradient, project])
+
+  // Canvas drawing for Canvas-tier renderers (e.g. Diamond)
+  useEffect(() => {
+    if (renderer?.tier === 'canvas' && canvasRef.current) {
+      const cvs = canvasRef.current
+      const ctx = cvs.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, cvs.width, cvs.height)
+        renderer.draw(ctx, gradient, project, cvs.width, cvs.height)
+      }
+    }
+  }, [renderer, gradient, project])
 
   const aspectRatio = canvas.width / canvas.height
 
   return (
-    <div className="relative flex-1 h-full w-full bg-muted/20 flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden select-none">
+    <div className="relative flex-1 h-full w-full bg-muted/20 flex flex-col items-center justify-between p-3 sm:p-5 overflow-hidden select-none gap-3">
       {/* Top badges bar */}
-      <div className="absolute top-3 inset-x-3 sm:inset-x-6 flex items-center justify-between text-[11px] text-muted-foreground z-10 pointer-events-none">
+      <div className="w-full flex items-center justify-between text-[11px] text-muted-foreground z-10 pointer-events-none">
         <div className="flex items-center gap-1.5 bg-background/80 backdrop-blur-xs px-2.5 py-1 rounded-full border border-border shadow-2xs font-mono">
           <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>{canvas.width} × {canvas.height} px</span>
           <span className="text-muted-foreground/60">•</span>
           <span className="capitalize">{gradient.type}</span>
+          <span className="text-muted-foreground/60">•</span>
+          <span className="uppercase text-[9px] px-1 py-0.2 bg-slate-800 rounded text-slate-300">
+            {renderer?.tier ?? 'css'}
+          </span>
         </div>
 
         <div className="hidden sm:flex items-center gap-1.5 bg-background/80 backdrop-blur-xs px-2.5 py-1 rounded-full border border-border shadow-2xs">
@@ -69,14 +62,14 @@ export default function Preview() {
       </div>
 
       {/* Canvas container centered and maintaining aspect ratio */}
-      <div className="relative w-full h-full flex items-center justify-center min-h-[220px] max-h-[85vh]">
+      <div className="relative w-full flex-1 flex items-center justify-center min-h-[220px] max-h-[72vh]">
         <div
           data-testid="preview-canvas"
           className="relative max-w-full max-h-full rounded-xl overflow-hidden shadow-2xl border border-border/80 ring-1 ring-black/5"
           style={{
             aspectRatio: `${canvas.width} / ${canvas.height}`,
-            width: aspectRatio >= 1 ? 'min(100%, 780px)' : 'auto',
-            height: aspectRatio < 1 ? 'min(100%, 600px)' : 'auto',
+            width: aspectRatio >= 1 ? 'min(100%, 720px)' : 'auto',
+            height: aspectRatio < 1 ? 'min(100%, 540px)' : 'auto',
           }}
         >
           {/* Transparency checkerboard background */}
@@ -100,18 +93,34 @@ export default function Preview() {
             style={{ backgroundColor: canvas.background }}
           />
 
-          {/* Active Gradient Layer */}
-          <div
-            className="absolute inset-0 w-full h-full transition-all duration-300"
-            style={{
-              background: gradientStyle,
-              opacity: global.opacity,
-              filter: global.blur > 0 ? `blur(${global.blur}px)` : undefined,
-              mixBlendMode: global.blendMode,
-            }}
-          />
+          {/* Layer: CSS gradient OR Canvas 2D */}
+          {renderer?.tier === 'canvas' ? (
+            <canvas
+              ref={canvasRef}
+              data-testid="canvas-renderer"
+              width={canvas.width}
+              height={canvas.height}
+              className="absolute inset-0 w-full h-full object-fill"
+              style={{
+                opacity: global.opacity,
+                filter: global.blur > 0 ? `blur(${global.blur}px)` : undefined,
+                mixBlendMode: global.blendMode,
+              }}
+            />
+          ) : (
+            <div
+              data-testid="css-renderer"
+              className="absolute inset-0 w-full h-full transition-all duration-200"
+              style={{
+                background: cssString ?? undefined,
+                opacity: global.opacity,
+                filter: global.blur > 0 ? `blur(${global.blur}px)` : undefined,
+                mixBlendMode: global.blendMode,
+              }}
+            />
+          )}
 
-          {/* Optional Noise layer overlay simulation if enabled */}
+          {/* Noise effect overlay simulation if enabled */}
           {project.effects.noise.enabled && (
             <div
               className="absolute inset-0 w-full h-full pointer-events-none mix-blend-overlay opacity-50"
@@ -124,10 +133,8 @@ export default function Preview() {
         </div>
       </div>
 
-      {/* Bottom control hints */}
-      <div className="absolute bottom-3 text-[11px] text-muted-foreground/70 hidden sm:block">
-        Live CSS & Canvas Preview • Scale: Fit
-      </div>
+      {/* Read-only CSS code output bar with Copy button */}
+      <CssOutputBox css={cssString} gradientType={gradient.type} />
     </div>
   )
 }

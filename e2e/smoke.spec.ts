@@ -163,3 +163,66 @@ test.describe('Phase 3 – Color System and Stop Editor', () => {
     await redoBtn.click()
   })
 })
+
+test.describe('Phase 4 – Basic Gradients (Types 1–7) with Live Preview', () => {
+  test('renders all seven basic types and Diamond canvas', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+
+    // 1. Linear (default)
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('linear-gradient(')
+
+    // Test Angle change in Linear (Type settings is open by default)
+    const angleInput = page.getByLabel(/Angle numeric input/i).first()
+    await angleInput.fill('45')
+    await expect(page.getByTestId('css-output-code')).toContainText('45deg')
+
+    // 2. Radial
+    const radialRadio = page.getByRole('radio', { name: /^Radial/i }).first()
+    await radialRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('radial-gradient(')
+
+    // Toggle shape to Ellipse
+    const ellipseBtn = page.getByRole('button', { name: 'Ellipse' }).first()
+    await ellipseBtn.click()
+    await expect(page.getByTestId('css-output-code')).toContainText('ellipse')
+
+    // 3. Conic
+    const conicRadio = page.getByRole('radio', { name: /^Conic/i }).first()
+    await conicRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('conic-gradient(')
+
+    // 4. Diamond (Canvas tier)
+    const diamondRadio = page.getByRole('radio', { name: /^Diamond/i }).first()
+    await diamondRadio.click()
+    await expect(page.getByTestId('canvas-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('Canvas 2D')
+
+    // 5. Repeating Linear
+    const repLinearRadio = page.getByRole('radio', { name: /Rep.*Linear/i }).first()
+    await repLinearRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('repeating-linear-gradient(')
+
+    // 6. Repeating Radial
+    const repRadialRadio = page.getByRole('radio', { name: /Rep.*Radial/i }).first()
+    await repRadialRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('repeating-radial-gradient(')
+
+    // 7. Repeating Conic
+    const repConicRadio = page.getByRole('radio', { name: /Rep.*Conic/i }).first()
+    await repConicRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByTestId('css-output-code')).toContainText('repeating-conic-gradient(')
+
+    // Test Copy CSS button
+    const copyBtn = page.getByRole('button', { name: /Copy CSS code/i }).first()
+    await copyBtn.click()
+    await expect(page.getByText('Copied!')).toBeVisible()
+  })
+})
