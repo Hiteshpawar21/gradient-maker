@@ -3,13 +3,13 @@ import { render, screen } from '@testing-library/react'
 import App from '../App'
 
 describe('App smoke test', () => {
-  it('renders the Gradient Maker heading', () => {
+  it('renders Gradient Maker application shell', () => {
     render(<App />)
-    expect(screen.getByText('Gradient Maker')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Gradient Maker/i })).toBeInTheDocument()
   })
 
-  it('renders the phase placeholder text', () => {
+  it('renders the preview canvas frame', () => {
     render(<App />)
-    expect(screen.getByText(/Phase 0/)).toBeInTheDocument()
+    expect(screen.getByTestId('preview-canvas')).toBeInTheDocument()
   })
 })
