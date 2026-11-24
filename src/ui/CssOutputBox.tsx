@@ -20,9 +20,7 @@ export function CssOutputBox({ css, gradientType }: CssOutputBoxProps) {
 
   const handleCopy = async () => {
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(cssRule)
-      }
+      await navigator.clipboard.writeText(cssRule)
     } catch {
       // Graceful fallback for non-permissioned environments
     }

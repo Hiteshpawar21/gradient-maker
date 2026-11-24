@@ -226,3 +226,40 @@ test.describe('Phase 4 – Basic Gradients (Types 1–7) with Live Preview', () 
     await expect(page.getByText('Copied!')).toBeVisible()
   })
 })
+
+
+test.describe('Phase 5 – Global Settings', () => {
+  test('aspect presets, global transforms, randomize and keyboard shortcuts', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+
+    // 1. Open Global panel
+    const globalHeader = page.getByRole('button', { name: /^Global/i }).first()
+    await globalHeader.click()
+
+    // 2. Click 1:1 preset
+    const btn1x1 = page.getByRole('button', { name: '1:1' }).first()
+    await btn1x1.click()
+    await expect(page.getByText('800 × 800 px').first()).toBeVisible()
+
+    // Click 16:9 preset
+    const btn16x9 = page.getByRole('button', { name: '16:9' }).first()
+    await btn16x9.click()
+    await expect(page.getByText('1280 × 720 px').first()).toBeVisible()
+
+    // 3. Overall blend mode
+    const blendSelect = page.getByLabel('Overall blend mode').first()
+    await blendSelect.selectOption('multiply')
+
+    // 4. Keyboard shortcut: 'r' to Randomize
+    await page.keyboard.press('r')
+
+    // 5. Keyboard shortcut: Ctrl+z to Undo randomize
+    await page.keyboard.press('Control+z')
+
+    // 6. Reset button
+    const resetBtn = page.getByRole('button', { name: /Reset/i }).first()
+    await resetBtn.click()
+    await expect(page.getByText('800 × 600 px').first()).toBeVisible()
+  })
+})

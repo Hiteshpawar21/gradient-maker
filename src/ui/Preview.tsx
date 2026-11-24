@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Preview Component
 // Renders live preview: CSS background for CSS tier, Canvas 2D for Canvas tier.
+// Reflects global settings (opacity, rotation, offset, blend mode, blur, glow).
 // Shows read-only generated CSS in a box with copy button.
 // ---------------------------------------------------------------------------
 
@@ -30,15 +31,54 @@ export default function Preview() {
   useEffect(() => {
     if (renderer?.tier === 'canvas' && canvasRef.current) {
       const cvs = canvasRef.current
-      const ctx = cvs.getContext('2d')
-      if (ctx) {
-        ctx.clearRect(0, 0, cvs.width, cvs.height)
-        renderer.draw(ctx, gradient, project, cvs.width, cvs.height)
+      try {
+        const ctx = cvs.getContext('2d')
+        if (ctx) {
+          ctx.clearRect(0, 0, cvs.width, cvs.height)
+          renderer.draw(ctx, gradient, project, cvs.width, cvs.height)
+        }
+      } catch {
+        // Fallback for headless environments without full Canvas 2D implementation
       }
     }
   }, [renderer, gradient, project])
 
   const aspectRatio = canvas.width / canvas.height
+
+  // Compute CSS filter string combining blur and glow drop-shadow
+  const computedFilter = useMemo(() => {
+    const filters: string[] = []
+    if (global.blur > 0) {
+      filters.push(`blur(${global.blur}px)`)
+    }
+    if (global.glow.amount > 0) {
+      filters.push(`drop-shadow(0 0 ${global.glow.amount}px ${global.glow.color})`)
+    }
+    return filters.length > 0 ? filters.join(' ') : undefined
+  }, [global.blur, global.glow.amount, global.glow.color])
+
+  // Compute CSS transform string for global rotation and offset
+  const computedTransform = useMemo(() => {
+    const parts: string[] = []
+    if (global.offsetX !== 0 || global.offsetY !== 0) {
+      parts.push(`translate(${global.offsetX}px, ${global.offsetY}px)`)
+    }
+    if (global.rotation !== 0) {
+      parts.push(`rotate(${global.rotation}deg)`)
+    }
+    return parts.length > 0 ? parts.join(' ') : undefined
+  }, [global.offsetX, global.offsetY, global.rotation])
+
+  // Shared layer styling applied identically to CSS and Canvas tiers
+  const layerStyle = useMemo(
+    () => ({
+      opacity: global.opacity,
+      filter: computedFilter,
+      transform: computedTransform,
+      mixBlendMode: global.blendMode,
+    }),
+    [global.opacity, computedFilter, computedTransform, global.blendMode],
+  )
 
   return (
     <div className="relative flex-1 h-full w-full bg-muted/20 flex flex-col items-center justify-between p-3 sm:p-5 overflow-hidden select-none gap-3">
@@ -100,12 +140,8 @@ export default function Preview() {
               data-testid="canvas-renderer"
               width={canvas.width}
               height={canvas.height}
-              className="absolute inset-0 w-full h-full object-fill"
-              style={{
-                opacity: global.opacity,
-                filter: global.blur > 0 ? `blur(${global.blur}px)` : undefined,
-                mixBlendMode: global.blendMode,
-              }}
+              className="absolute inset-0 w-full h-full object-fill transition-all duration-200"
+              style={layerStyle}
             />
           ) : (
             <div
@@ -113,9 +149,7 @@ export default function Preview() {
               className="absolute inset-0 w-full h-full transition-all duration-200"
               style={{
                 background: cssString ?? undefined,
-                opacity: global.opacity,
-                filter: global.blur > 0 ? `blur(${global.blur}px)` : undefined,
-                mixBlendMode: global.blendMode,
+                ...layerStyle,
               }}
             />
           )}

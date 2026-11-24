@@ -10,6 +10,7 @@ import {
   ExportPanel,
 } from './panels'
 import { useStore } from '@/core/store'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { X, Layers, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -47,34 +48,8 @@ export default function Shell() {
     }
   }, [theme])
 
-  // Keyboard shortcuts (Ctrl+Z, Shift+Z, R)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Do not trigger when typing in input/textarea
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
-        return
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        if (e.shiftKey) {
-          e.preventDefault()
-          useStore.getState().redo()
-        } else {
-          e.preventDefault()
-          useStore.getState().undo()
-        }
-      } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault()
-        useStore.getState().randomize()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  // Global keyboard shortcuts (Ctrl+Z, Shift+Z, R)
+  useKeyboardShortcuts()
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground font-sans">
