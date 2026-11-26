@@ -51,7 +51,7 @@ test.describe('Phase 2 – App Shell and Layout', () => {
 
     // Toggle noise accordion open
     await noiseHeader.click()
-    await expect(page.getByText(/Enable noise overlay/i).first()).toBeVisible()
+    await expect(page.getByText(/Noise Effect/i).first()).toBeVisible()
 
     // Toggle colors accordion closed
     await colorsHeader.click()
@@ -261,5 +261,73 @@ test.describe('Phase 5 – Global Settings', () => {
     const resetBtn = page.getByRole('button', { name: /Reset/i }).first()
     await resetBtn.click()
     await expect(page.getByText('800 × 600 px').first()).toBeVisible()
+  })
+})
+
+
+test.describe('Phase 6 – Noise and Texture Effect System', () => {
+  test('enabling noise, applying texture presets, and grainy gradient type', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+
+    // 1. Open Noise & texture panel
+    const noiseHeader = page.getByRole('button', { name: /^Noise & texture/i }).first()
+    await noiseHeader.click()
+
+    // 2. Enable noise
+    const toggleNoiseBtn = page.getByRole('button', { name: /Toggle noise/i }).first()
+    await toggleNoiseBtn.click()
+    await expect(page.getByText('NOISE').first()).toBeVisible()
+
+    // 3. Apply Film Grain preset
+    const filmGrainBtn = page.getByRole('button', { name: /Film Grain/i }).first()
+    await filmGrainBtn.click()
+
+    // 4. Test Grainy (Type 15) in TypePicker
+    const grainyRadio = page.getByRole('radio', { name: /^Grainy/i }).first()
+    await grainyRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByText('NOISE').first()).toBeVisible()
+  })
+})
+
+test.describe('Phase 7 – Advanced Gradients Part A', () => {
+  test('renders Layered, Reflected, Holographic, and Grainy with settings and CSS output', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+
+    // 1. Reflected (Type 12)
+    const reflectedRadio = page.getByRole('radio', { name: /^Reflected/i }).first()
+    await reflectedRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByText(/linear-gradient/i).first()).toBeVisible()
+
+    // Toggle symmetry in Reflected
+    const vertBtn = page.getByRole('button', { name: 'Vertical' }).first()
+    await vertBtn.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+
+    // 2. Holographic (Type 14)
+    const holoRadio = page.getByRole('radio', { name: /^Holographic/i }).first()
+    await holoRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByText(/conic-gradient/i).first()).toBeVisible()
+
+    // 3. Layered (Type 11)
+    const layeredRadio = page.getByRole('radio', { name: /^Layered/i }).first()
+    await layeredRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByText(/Layers Stack/i).first()).toBeVisible()
+
+    // Add a layer in LayeredControls
+    const addLayerBtn = page.getByRole('button', { name: /Add Layer/i }).first()
+    await addLayerBtn.click()
+    await expect(page.getByText(/Layers Stack \(3\)/i).first()).toBeVisible()
+
+    // 4. Grainy (Type 15)
+    const grainyRadio = page.getByRole('radio', { name: /^Grainy/i }).first()
+    await grainyRadio.click()
+    await expect(page.getByTestId('css-renderer')).toBeVisible()
+    await expect(page.getByText('NOISE').first()).toBeVisible()
   })
 })

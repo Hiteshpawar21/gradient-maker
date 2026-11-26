@@ -1,19 +1,20 @@
 // ---------------------------------------------------------------------------
 // Preview Component
 // Renders live preview: CSS background for CSS tier, Canvas 2D for Canvas tier.
-// Reflects global settings (opacity, rotation, offset, blend mode, blur, glow).
+// Reflects global settings and procedural noise & texture effects.
 // Shows read-only generated CSS in a box with copy button.
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useEffect } from 'react'
 import { useStore } from '@/core/store'
-import { getRenderer } from '@/engine'
+import { getRenderer, layeredToCSSProperties } from '@/engine'
+import { generateNoiseDataUrl, applyNoiseToCanvas } from '@/engine/noise'
 import { CssOutputBox } from './CssOutputBox'
 import { Maximize2 } from 'lucide-react'
 
 export default function Preview() {
   const { project } = useStore()
-  const { canvas, gradient, global } = project
+  const { canvas, gradient, global, effects } = project
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   // Get renderer from engine registry
@@ -35,13 +36,24 @@ export default function Preview() {
         const ctx = cvs.getContext('2d')
         if (ctx) {
           ctx.clearRect(0, 0, cvs.width, cvs.height)
+
+          // Underlay noise drawn before gradient
+          if (effects.noise.enabled && effects.noise.blending === 'underlay') {
+            applyNoiseToCanvas(ctx, effects.noise, cvs.width, cvs.height)
+          }
+
           renderer.draw(ctx, gradient, project, cvs.width, cvs.height)
+
+          // Overlay/embedded noise drawn after gradient
+          if (effects.noise.enabled && effects.noise.blending !== 'underlay') {
+            applyNoiseToCanvas(ctx, effects.noise, cvs.width, cvs.height)
+          }
         }
       } catch {
         // Fallback for headless environments without full Canvas 2D implementation
       }
     }
-  }, [renderer, gradient, project])
+  }, [renderer, gradient, project, effects.noise])
 
   const aspectRatio = canvas.width / canvas.height
 
@@ -80,6 +92,41 @@ export default function Preview() {
     [global.opacity, computedFilter, computedTransform, global.blendMode],
   )
 
+  // Procedural noise tile Data-URL for CSS tier
+  const noiseDataUrl = useMemo(() => {
+    if (!effects.noise.enabled || renderer?.tier === 'canvas') return null
+    return generateNoiseDataUrl(effects.noise, 128)
+  }, [effects.noise, renderer?.tier])
+
+  // Noise layer styling with blend mode, scale, and optional alpha masking
+  const noiseLayerStyle = useMemo(() => {
+    if (!noiseDataUrl) return undefined
+    const tileSize = Math.max(16, Math.round(128 * effects.noise.scale))
+    return {
+      backgroundImage: `url(${noiseDataUrl})`,
+      backgroundRepeat: 'repeat',
+      backgroundSize: `${tileSize}px ${tileSize}px`,
+      mixBlendMode: effects.noise.blendMode,
+      opacity: effects.noise.opacity,
+      maskImage:
+        effects.noise.preserveTransparency && cssString
+          ? cssString
+          : undefined,
+      WebkitMaskImage:
+        effects.noise.preserveTransparency && cssString
+          ? cssString
+          : undefined,
+    }
+  }, [noiseDataUrl, effects.noise, cssString])
+
+  // Multi-background properties for Layered gradient type
+  const layeredProps = useMemo(() => {
+    if (gradient.type === 'layered') {
+      return layeredToCSSProperties(gradient, project)
+    }
+    return null
+  }, [gradient, project])
+
   return (
     <div className="relative flex-1 h-full w-full bg-muted/20 flex flex-col items-center justify-between p-3 sm:p-5 overflow-hidden select-none gap-3">
       {/* Top badges bar */}
@@ -93,6 +140,12 @@ export default function Preview() {
           <span className="uppercase text-[9px] px-1 py-0.2 bg-slate-800 rounded text-slate-300">
             {renderer?.tier ?? 'css'}
           </span>
+          {effects.noise.enabled && (
+            <>
+              <span className="text-muted-foreground/60">•</span>
+              <span className="text-[10px] text-amber-400 font-semibold">NOISE</span>
+            </>
+          )}
         </div>
 
         <div className="hidden sm:flex items-center gap-1.5 bg-background/80 backdrop-blur-xs px-2.5 py-1 rounded-full border border-border shadow-2xs">
@@ -133,6 +186,15 @@ export default function Preview() {
             style={{ backgroundColor: canvas.background }}
           />
 
+          {/* Underlay Noise Layer (beneath gradient) */}
+          {noiseLayerStyle && effects.noise.blending === 'underlay' && (
+            <div
+              data-testid="noise-underlay"
+              className="absolute inset-0 w-full h-full pointer-events-none transition-all duration-200"
+              style={noiseLayerStyle}
+            />
+          )}
+
           {/* Layer: CSS gradient OR Canvas 2D */}
           {renderer?.tier === 'canvas' ? (
             <canvas
@@ -148,20 +210,26 @@ export default function Preview() {
               data-testid="css-renderer"
               className="absolute inset-0 w-full h-full transition-all duration-200"
               style={{
-                background: cssString ?? undefined,
+                ...(layeredProps
+                  ? {
+                      backgroundImage: layeredProps.backgroundImage,
+                      backgroundPosition: layeredProps.backgroundPosition,
+                      backgroundSize: layeredProps.backgroundSize,
+                      backgroundBlendMode: layeredProps.backgroundBlendMode,
+                      backgroundRepeat: layeredProps.backgroundRepeat,
+                    }
+                  : { background: cssString ?? undefined }),
                 ...layerStyle,
               }}
             />
           )}
 
-          {/* Noise effect overlay simulation if enabled */}
-          {project.effects.noise.enabled && (
+          {/* Overlay / Embedded Noise Layer (above gradient) */}
+          {noiseLayerStyle && effects.noise.blending !== 'underlay' && (
             <div
-              className="absolute inset-0 w-full h-full pointer-events-none mix-blend-overlay opacity-50"
-              style={{
-                backgroundImage: `radial-gradient(rgba(0,0,0,0.4) 1px, transparent 0)`,
-                backgroundSize: '4px 4px',
-              }}
+              data-testid="noise-overlay"
+              className="absolute inset-0 w-full h-full pointer-events-none transition-all duration-200"
+              style={noiseLayerStyle}
             />
           )}
         </div>

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // TypeSettingsPanel Component
-// Dedicated parameter controls for gradient types 1–7.
+// Dedicated parameter controls for gradient types 1–7 and Type 15 (Grainy).
 // ---------------------------------------------------------------------------
 
 import { SlidersHorizontal } from 'lucide-react'
@@ -15,6 +15,10 @@ import {
   RepeatingRadialControls,
   RepeatingConicControls,
 } from './type-settings/RepeatingControls'
+import { GrainyControls } from './type-settings/GrainyControls'
+import { ReflectedControls } from './type-settings/ReflectedControls'
+import { HolographicControls } from './type-settings/HolographicControls'
+import { LayeredControls } from './type-settings/LayeredControls'
 
 export function TypeSettingsPanel({
   isOpen,
@@ -92,7 +96,39 @@ export function TypeSettingsPanel({
           />
         )}
 
-        {/* Placeholder for types 8–15 */}
+        {/* Type 11: Layered */}
+        {gradient.type === 'layered' && (
+          <LayeredControls
+            config={gradient}
+            onChange={(upd) => updateGradient(upd)}
+          />
+        )}
+
+        {/* Type 12: Reflected */}
+        {gradient.type === 'reflected' && (
+          <ReflectedControls
+            config={gradient}
+            onChange={(upd) => updateGradient(upd)}
+          />
+        )}
+
+        {/* Type 14: Holographic */}
+        {gradient.type === 'holographic' && (
+          <HolographicControls
+            config={gradient}
+            onChange={(upd) => updateGradient(upd)}
+          />
+        )}
+
+        {/* Type 15: Grainy */}
+        {gradient.type === 'grainy' && (
+          <GrainyControls
+            config={gradient}
+            onChange={(upd) => updateGradient(upd)}
+          />
+        )}
+
+        {/* Placeholder for remaining types */}
         {![
           'linear',
           'radial',
@@ -101,6 +137,10 @@ export function TypeSettingsPanel({
           'repeating-linear',
           'repeating-radial',
           'repeating-conic',
+          'layered',
+          'reflected',
+          'holographic',
+          'grainy',
         ].includes(gradient.type) && (
           <div className="text-xs text-slate-400 py-2 italic">
             Settings for {gradient.type} gradient will be available in subsequent phases.

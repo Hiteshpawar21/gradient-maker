@@ -15,7 +15,7 @@ describe('UI Shell & Layout', () => {
     expect(screen.getByRole('heading', { name: /Gradient Maker/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/undo/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/redo/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /randomize/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^randomize$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reset/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /import/i })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /export/i }).length).toBeGreaterThan(0)

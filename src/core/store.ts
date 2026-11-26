@@ -88,11 +88,19 @@ export const useStore = create<
           if (state.project.gradient.type === type) return state
           const newGrad = defaultGradientConfig(type)
           const firstStopId = hasStops(newGrad) && newGrad.stops.length > 0 ? newGrad.stops[0].id : null
+          const enableNoise = type === 'grainy' ? true : state.project.effects.noise.enabled
           return {
             selectedStopId: firstStopId,
             project: {
               ...state.project,
               gradient: newGrad,
+              effects: {
+                ...state.project.effects,
+                noise: {
+                  ...state.project.effects.noise,
+                  enabled: enableNoise,
+                },
+              },
             },
           }
         })
